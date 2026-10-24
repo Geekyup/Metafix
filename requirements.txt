@@ -1,0 +1,4 @@
+aiogram>=3.13
+redis>=5.0
+mutagen>=1.47
+pydantic-settings>=2.5
