@@ -4,6 +4,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
+from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
 
 from app.bot.routers import cover, edit, finish, upload
@@ -24,7 +25,10 @@ async def main():
     logging.basicConfig(level=logging.INFO)
 
     bot = make_bot()
-    storage = RedisStorage.from_url(settings.redis_url)
+    if settings.redis_url:
+        storage = RedisStorage.from_url(settings.redis_url)
+    else:
+        storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
     dp.include_routers(edit.router, cover.router, finish.router, upload.router)
 
