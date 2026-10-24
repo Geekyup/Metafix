@@ -60,6 +60,7 @@ async def done(call: CallbackQuery, state: FSMContext):
         await call.message.answer_document(file)
 
     await call.message.edit_text("✅ Готово")
+    await call.message.answer("🔁 Пришли следующий аудиофайл: mp3, flac, m4a, ogg или opus")
 
     shutil.rmtree(folder, ignore_errors=True)
     await state.clear()
