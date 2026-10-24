@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     temp_dir: Path = Path("/tmp/tgmeta")
     max_file_size: int = 20 * 1024 * 1024
+    proxy: str | None = None
+    session_ttl: int = 3600
 
 
 settings = Settings()
