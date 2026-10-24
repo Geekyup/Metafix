@@ -7,20 +7,42 @@ from app.audio.models import FIELD_LABELS
 from app.bot.keyboards import card_kb
 
 
+def field_view(data: dict, key: str) -> tuple[str, bool]:
+    items = data["items"]
+    edits = data["edits"]
+    values = [edits[key] if key in edits else item["draft"][key] for item in items]
+    changed = any(value != item["original"][key] for value, item in zip(values, items))
+    if len(set(values)) > 1:
+        return "разные", changed
+    return values[0] or "—", changed
+
+
 def card_text(data: dict) -> str:
-    lines = [f"🎵 {data['name']}", ""]
+    items = data["items"]
+    if len(items) == 1:
+        lines = [f"🎵 {items[0]['name']}", ""]
+    else:
+        lines = [f"📚 Файлов: {len(items)}", ""]
+
     for key, label in FIELD_LABELS.items():
-        value = data["draft"][key]
-        mark = " ✱" if value != data["original"][key] else ""
-        lines.append(f"{label}: {value or '—'}{mark}")
+        text, changed = field_view(data, key)
+        lines.append(f"{label}: {text}{' ✱' if changed else ''}")
 
     if data["cover"] == "keep":
-        status = "есть" if data["had_cover"] else "нет"
+        if data["covers"] == len(items):
+            status = "есть"
+        elif data["covers"]:
+            status = "у части файлов"
+        else:
+            status = "нет"
     elif data["cover"] == "new":
         status = "новая ✱"
     else:
         status = "удалена ✱"
     lines.append(f"Обложка: {status}")
+
+    if len(items) > 1:
+        lines += ["", "Правки применятся ко всем файлам"]
     return "\n".join(lines)
 
 

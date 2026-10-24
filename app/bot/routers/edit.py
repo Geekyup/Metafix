@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.audio.models import FIELD_LABELS
-from app.bot.card import refresh_card
+from app.bot.card import field_view, refresh_card
 from app.bot.keyboards import value_kb
 from app.bot.states import Editing
 
@@ -27,8 +27,8 @@ def check(field: str, value: str) -> None:
 
 async def apply_value(state: FSMContext, bot: Bot, chat_id: int, value: str | None):
     data = await state.get_data()
-    draft = {**data["draft"], data["field"]: value}
-    await state.update_data(draft=draft)
+    edits = {**data["edits"], data["field"]: value}
+    await state.update_data(edits=edits)
     await state.set_state(Editing.card)
     await refresh_card(bot, chat_id, await state.get_data())
 
@@ -37,7 +37,7 @@ async def apply_value(state: FSMContext, bot: Bot, chat_id: int, value: str | No
 async def pick_field(call: CallbackQuery, state: FSMContext):
     field = call.data.split(":", 1)[1]
     data = await state.get_data()
-    current = data["draft"][field] or "—"
+    current, _ = field_view(data, field)
     await state.update_data(field=field)
     await state.set_state(Editing.value)
     await call.message.edit_text(
@@ -90,14 +90,15 @@ async def cancel(call: CallbackQuery, state: FSMContext, bot: Bot):
 @router.callback_query(Editing.card, F.data == "reset")
 async def reset(call: CallbackQuery, state: FSMContext, bot: Bot):
     data = await state.get_data()
-    await state.update_data(draft=dict(data["original"]), cover="keep")
+    items = [{**item, "draft": dict(item["original"])} for item in data["items"]]
+    await state.update_data(items=items, edits={}, cover="keep")
     await refresh_card(bot, call.message.chat.id, await state.get_data())
     await call.answer("Сброшено")
 
 
 @router.callback_query(Editing.card, F.data == "clear")
 async def clear_all(call: CallbackQuery, state: FSMContext, bot: Bot):
-    draft = {key: None for key in FIELD_LABELS}
-    await state.update_data(draft=draft, cover="removed")
+    edits = {key: None for key in FIELD_LABELS}
+    await state.update_data(edits=edits, cover="removed")
     await refresh_card(bot, call.message.chat.id, await state.get_data())
     await call.answer("Всё очищено")
