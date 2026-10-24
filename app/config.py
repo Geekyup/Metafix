@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     max_file_size: int = 20 * 1024 * 1024
     proxy: str | None = None
     session_ttl: int = 3600
+    api_url: str | None = None
+    api_data_dir: Path | None = None
 
 
 settings = Settings()
