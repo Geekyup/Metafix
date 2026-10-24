@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 import shutil
 from pathlib import Path
@@ -10,6 +11,8 @@ from aiogram.types import CallbackQuery, FSInputFile
 from app.audio.models import Cover, Tags
 from app.audio.registry import get_handler
 from app.bot.states import Editing
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -32,20 +35,32 @@ async def done(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     folder = Path(data["folder"])
     path = folder / data["file"]
+
+    if not path.exists():
+        await state.clear()
+        await call.message.edit_text("Сессия устарела. Пришли файл заново")
+        await call.answer()
+        return
+
     handler = get_handler(path)
 
-    current = await asyncio.to_thread(handler.read, path)
-    tags = Tags(**data["draft"], cover=current.cover)
+    try:
+        current = await asyncio.to_thread(handler.read, path)
+        tags = Tags(**data["draft"], cover=current.cover)
 
-    if data["cover"] == "removed":
-        tags.cover = None
-    elif data["cover"] == "new":
-        tags.cover = Cover(
-            data=(folder / "cover").read_bytes(),
-            mime=data["cover_mime"],
-        )
+        if data["cover"] == "removed":
+            tags.cover = None
+        elif data["cover"] == "new":
+            tags.cover = Cover(
+                data=(folder / "cover").read_bytes(),
+                mime=data["cover_mime"],
+            )
 
-    await asyncio.to_thread(handler.write, path, tags)
+        await asyncio.to_thread(handler.write, path, tags)
+    except Exception:
+        logger.exception("failed to write %s", data["name"])
+        await call.answer("Не удалось сохранить файл", show_alert=True)
+        return
 
     filename = build_name(tags, path.suffix, data["name"])
     file = FSInputFile(path, filename=filename)

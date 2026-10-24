@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import shutil
 import uuid
 from pathlib import Path
@@ -14,6 +15,9 @@ from app.bot.card import card_text
 from app.bot.keyboards import card_kb
 from app.bot.states import Editing
 from app.config import settings
+from app.services.session import parse_name
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -38,25 +42,36 @@ async def on_file(message: Message, bot: Bot, state: FSMContext):
         await message.answer("Формат не поддерживается")
         return
 
-    old = await state.get_data()
-    if old.get("folder"):
-        shutil.rmtree(old["folder"], ignore_errors=True)
-
     folder = settings.temp_dir / str(message.from_user.id) / uuid.uuid4().hex
     folder.mkdir(parents=True, exist_ok=True)
     file_on_disk = f"audio{Path(name).suffix.lower()}"
     path = folder / file_on_disk
 
-    await bot.download(file, destination=path)
-    tags = await asyncio.to_thread(handler.read, path)
+    try:
+        await bot.download(file, destination=path)
+        tags = await asyncio.to_thread(handler.read, path)
+    except Exception:
+        logger.exception("failed to read %s", name)
+        shutil.rmtree(folder, ignore_errors=True)
+        await message.answer("Не удалось прочитать файл. Возможно, он повреждён")
+        return
+
+    old = await state.get_data()
+    if old.get("folder"):
+        shutil.rmtree(old["folder"], ignore_errors=True)
 
     fields = {key: getattr(tags, key) for key in FIELD_LABELS}
+    draft = dict(fields)
+    for key, value in parse_name(name).items():
+        if not draft[key]:
+            draft[key] = value
+
     data = {
         "folder": str(folder),
         "file": file_on_disk,
         "name": name,
         "original": fields,
-        "draft": dict(fields),
+        "draft": draft,
         "cover": "keep",
         "had_cover": tags.cover is not None,
     }
