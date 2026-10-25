@@ -6,10 +6,20 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
+from aiohttp import web
 
 from app.bot.routers import cover, edit, finish, upload
 from app.config import settings
 from app.services.cleanup import cleanup_loop
+
+
+async def start_health(port: int) -> web.AppRunner:
+    app = web.Application()
+    app.router.add_get("/", lambda request: web.Response(text="ok"))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    await web.TCPSite(runner, "0.0.0.0", port).start()
+    return runner
 
 
 def make_bot() -> Bot:
@@ -32,6 +42,8 @@ async def main():
     dp = Dispatcher(storage=storage)
     dp.include_routers(edit.router, cover.router, finish.router, upload.router)
 
+    health = await start_health(settings.health_port) if settings.health_port else None
+
     cleanup = asyncio.create_task(
         cleanup_loop(settings.temp_dir, settings.session_ttl, settings.api_data_dir)
     )
@@ -39,6 +51,8 @@ async def main():
         await dp.start_polling(bot)
     finally:
         cleanup.cancel()
+        if health:
+            await health.cleanup()
 
 
 if __name__ == "__main__":

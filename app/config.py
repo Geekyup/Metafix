@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     session_ttl: int = 3600
     api_url: str | None = None
     api_data_dir: Path | None = None
+    health_port: int | None = None
 
 
 settings = Settings()
